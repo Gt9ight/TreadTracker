@@ -64,14 +64,15 @@ const Report = () => {
         {selectedFleet && (
           <SafeAreaView style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Fleet Details</Text>
-            <Text style={styles.fleetDate}>Fleet Date: {selectedFleet[0].fleetDate}</Text>
-            <Text style={styles.unitCount}>Units: {selectedFleet.length}</Text>
             {selectedFleet.map((fleet, index) => (
-              <View key={index} style={styles.unitContainer}>
+              <View key={index}>
+                <Text style={styles.fleetDate}>Fleet Date: {fleet.fleetDate}</Text>
+                <Text style={styles.unitCount}>Units: {fleet.units.length}</Text>
                 {fleet.units.map((unit, unitIndex) => (
-                  <View key={unitIndex} style={styles.unitText}>
-                    <Text>{unit.unitType} # {unit.unitNumber}</Text>
-                    <Text>Urgency: {unit.urgency}</Text>
+                  <View key={unitIndex} style={styles.unitContainer}>
+                    <Text style={styles.unitText}>Unit Type: {unit.unitType}</Text>
+                    <Text style={styles.unitText}>Unit Number: {unit.unitNumber}</Text>
+                    <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
                     {unit.specifics?.length > 0 && (
                       <View style={styles.specificsContainer}>
                         <Text style={styles.specificsTitle}>Specifics:</Text>
@@ -155,6 +156,7 @@ const styles = StyleSheet.create({
   },
   unitText: {
     fontSize: 16,
+    marginBottom: 5,
   },
   specificsContainer: {
     marginTop: 5,
