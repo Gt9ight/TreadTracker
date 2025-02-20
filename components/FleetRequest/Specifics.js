@@ -44,6 +44,14 @@ const Specifics = ({ onDone }) => {
         }
     };
 
+    const handleDonePress = () => {
+        onDone(specificsList);
+        setSpecificsList([]); // Clear after saving
+      };
+      const deleteSpecific = (index) => {
+        setSpecificsList(specificsList.filter((_, i) => i !== index));
+    };
+
     return (
         <SafeAreaView style={{ flex: 1 }}>
             <View style={{ padding: 20, flex: 1 }}>
@@ -142,6 +150,11 @@ const Specifics = ({ onDone }) => {
                 <ScrollView style={{ marginTop: 15 }}>
                     {specificsList.map((item, index) => (
                         <View key={index} style={{ marginTop: 15, padding: 10, borderWidth: 1, borderRadius: 8, borderColor: '#ccc' }}>
+                                                        <TouchableOpacity
+                                onPress={() => deleteSpecific(index)}
+                                style={{position: 'absolute',top: 5, right: 5, backgroundColor: 'red',  paddingVertical: 5, paddingHorizontal: 10,  borderRadius: 5,}}>
+                                <Text style={{ color: 'white', fontWeight: 'bold' }}>X</Text>
+                            </TouchableOpacity>
                             <Text style={{ fontSize: 16, fontWeight: 'bold' }}>Position: {item.position}</Text>
                             <Text>Service Type: {item.ServiceType}</Text>
                             <Text>Tread Depth: {item.treadDepth}</Text>
@@ -149,9 +162,9 @@ const Specifics = ({ onDone }) => {
                         </View>
                     ))}
                 </ScrollView>
-                <TouchableOpacity onPress={() => onDone(specificsList)}>
-        <Text>Done</Text>
-      </TouchableOpacity>
+                <TouchableOpacity onPress={handleDonePress}>
+  <Text>Done</Text>
+</TouchableOpacity>
             </View>
         </SafeAreaView>
     );

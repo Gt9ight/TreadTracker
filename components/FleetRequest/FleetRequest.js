@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal} from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { db } from "../../utilis/Firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 import Specifics from "./Specifics";
 
 
@@ -65,20 +65,46 @@ const FleetRequest = () => {
       Alert.alert("No Units", "Please add at least one unit before submitting.");
       return;
     }
-
+  
     try {
-      await addDoc(collection(db, "fleets"), {
-        fleetDate,
-        units: units.map((unit, index) => ({
-          ...unit,
-          specifics: unitSpecifics[index] || [],
-        })),
-        timestamp: new Date(),
-      });
-      Alert.alert("Success", "Fleet submitted successfully!");
+      const fleetRef = collection(db, "fleets");
+  
+      // Check if a fleet already exists for the selected date
+      const q = query(fleetRef, where("fleetDate", "==", fleetDate));
+      const querySnapshot = await getDocs(q);
+  
+      if (!querySnapshot.empty) {
+        // Fleet already exists, update the document
+        const fleetDoc = querySnapshot.docs[0]; // Get the first matching document
+        const existingUnits = fleetDoc.data().units || [];
+  
+        await updateDoc(doc(db, "fleets", fleetDoc.id), {
+          units: [...existingUnits, ...units.map((unit, index) => ({
+            ...unit,
+            specifics: unitSpecifics[index] || [],
+          }))],
+        });
+  
+        Alert.alert("Success", "Fleet updated successfully!");
+      } else {
+        // Fleet does not exist, create a new document
+        await addDoc(fleetRef, {
+          fleetDate,
+          units: units.map((unit, index) => ({
+            ...unit,
+            specifics: unitSpecifics[index] || [],
+          })),
+          timestamp: new Date(),
+        });
+  
+        Alert.alert("Success", "Fleet created successfully!");
+      }
+  
+      // Clear form after submission
       setUnits([]);
       setFleetDate(null);
       setUnitSpecifics({});
+  
     } catch (error) {
       console.error("Error submitting fleet:", error);
       Alert.alert("Error", "Could not submit fleet. Please try again.");
@@ -86,15 +112,15 @@ const FleetRequest = () => {
   };
 
 
-const handleDoneSpecifics = (specifics) => {
-  if (selectedUnitIndex !== null) {
-    setUnitSpecifics((prev) => ({
-      ...prev,
-      [selectedUnitIndex]: [...(prev[selectedUnitIndex] || []), ...specifics],
-    }));
-  }
-  setIsSpecificsVisible(false);
-};
+  const handleDoneSpecifics = (specifics) => {
+    if (selectedUnitIndex !== null) {
+      setUnitSpecifics((prev) => ({
+        ...prev,
+        [selectedUnitIndex]: specifics, // Replace existing instead of appending
+      }));
+    }
+    setIsSpecificsVisible(false);
+  };
 
   return (
     <View style={styles.container}>
@@ -160,11 +186,14 @@ const handleDoneSpecifics = (specifics) => {
                 <Text style={styles.addSpecificsText}>Upload Image</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.addSpecificsButton}
-                onPress={() => setIsSpecificsVisible(true)}
-              >
-                <Text style={styles.addSpecificsText}>Add Specifics</Text>
-              </TouchableOpacity>
+  style={styles.addSpecificsButton}
+  onPress={() => {
+    setSelectedUnitIndex(index); // Track which unit is being edited
+    setIsSpecificsVisible(true);
+  }}
+>
+  <Text style={styles.addSpecificsText}>Add Specifics</Text>
+</TouchableOpacity>
             </View>
           
           </View>

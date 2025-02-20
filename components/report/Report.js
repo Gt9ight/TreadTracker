@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Modal } from "react-native";
-import { collection, onSnapshot } from "firebase/firestore";
+import { 
+  View, Text, ScrollView, StyleSheet, ActivityIndicator, 
+  TouchableOpacity, Modal 
+} from "react-native";
+import { collection, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { db } from "../../utilis/Firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const Report = () => {
-  const [fleets, setFleets] = useState([]);
+  const [fleets, setFleets] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedFleet, setSelectedFleet] = useState(null);
 
@@ -19,10 +22,9 @@ const Report = () => {
       setLoading(false);
     });
 
-    return () => unsubscribe(); // Unsubscribe from updates when unmounting
+    return () => unsubscribe();
   }, []);
 
-  // Group the fleets by fleetDate
   const groupByDate = (fleets) => {
     return fleets.reduce((acc, fleet) => {
       const { fleetDate } = fleet;
@@ -32,6 +34,36 @@ const Report = () => {
       acc[fleetDate].push(fleet);
       return acc;
     }, {});
+  };
+
+  // Toggle unit completion and update Firebase
+  const toggleUnitCompletion = async (fleetId, unitIndex) => {
+    try {
+      const fleetRef = doc(db, "fleets", fleetId);
+      const updatedUnits = selectedFleet.map((fleet) => {
+        return {
+          ...fleet,
+          units: fleet.units.map((unit, index) =>
+            index === unitIndex ? { ...unit, completed: !unit.completed } : unit
+          ),
+        };
+      });
+
+      await updateDoc(fleetRef, { units: updatedUnits[0].units });
+      setSelectedFleet(updatedUnits);
+    } catch (error) {
+      console.error("Error toggling unit completion:", error);
+    }
+  };
+
+  // Calculate progress percentage
+  const getCompletionPercentage = (fleet) => {
+    const totalUnits = fleet.reduce((sum, f) => sum + (f.units?.length || 0), 0);
+    const completedUnits = fleet.reduce(
+      (sum, f) => sum + (f.units?.filter((unit) => unit.completed).length || 0),
+      0
+    );
+    return totalUnits === 0 ? 0 : Math.round((completedUnits / totalUnits) * 100);
   };
 
   const handleFleetPress = (fleet) => {
@@ -47,31 +79,47 @@ const Report = () => {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <SafeAreaView>
       <Text style={styles.title}>Fleet List</Text>
-      {Object.keys(fleets).length === 0 ? (
-        <Text style={styles.noData}>No fleets available.</Text>
-      ) : (
-        Object.keys(fleets).map((fleetDate) => (
-          <TouchableOpacity key={fleetDate} onPress={() => handleFleetPress(fleets[fleetDate])} style={styles.fleetCard}>
-            <Text style={styles.fleetDate}>Fleet Date: {fleetDate}</Text>
-            <Text style={styles.unitCount}>Units: {fleets[fleetDate].length}</Text>
-          </TouchableOpacity>
-        ))
-      )}
+      <ScrollView contentContainerStyle={styles.container}>
+        {Object.keys(fleets).length === 0 ? (
+          <Text style={styles.noData}>No fleets available.</Text>
+        ) : (
+          Object.keys(fleets).map((fleetDate) => {
+            const completionPercentage = getCompletionPercentage(fleets[fleetDate]);
+            return (
+              <TouchableOpacity key={fleetDate} onPress={() => handleFleetPress(fleets[fleetDate])} style={styles.fleetCard}>
+                <Text style={styles.fleetDate}>Fleet Date: {fleetDate}</Text>
+                <Text style={styles.unitCount}>
+                  Units: {fleets[fleetDate].reduce((sum, fleet) => sum + (fleet.units?.length || 0), 0)}
+                </Text>
 
-      <Modal visible={selectedFleet !== null} animationType="slide" onRequestClose={handleCloseModal}>
-        {selectedFleet && (
-          <SafeAreaView style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Fleet Details</Text>
-            {selectedFleet.map((fleet, index) => (
-              <View key={index}>
-                <Text style={styles.fleetDate}>Fleet Date: {fleet.fleetDate}</Text>
-                <Text style={styles.unitCount}>Units: {fleet.units.length}</Text>
-                {fleet.units.map((unit, unitIndex) => (
-                  <View key={unitIndex} style={styles.unitContainer}>
-                    <Text style={styles.unitText}>Unit Type: {unit.unitType}</Text>
-                    <Text style={styles.unitText}>Unit Number: {unit.unitNumber}</Text>
+                {/* Progress Bar */}
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+                </View>
+                <Text style={styles.progressText}>{completionPercentage}% Completed</Text>
+              </TouchableOpacity>
+            );
+          })
+        )}
+
+        {/* Fleet Details Modal */}
+        <Modal visible={selectedFleet !== null} animationType="slide" onRequestClose={handleCloseModal}>
+          {selectedFleet && (
+            <SafeAreaView style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>Fleet Details</Text>
+              <ScrollView>
+                {selectedFleet.flatMap((fleet) => fleet.units).map((unit, unitIndex) => (
+                  <TouchableOpacity 
+                    key={unitIndex} 
+                    onPress={() => toggleUnitCompletion(selectedFleet[0].id, unitIndex)}
+                    style={[
+                      styles.unitContainer,
+                      unit.completed && styles.completedUnit
+                    ]}
+                  >
+                    <Text style={styles.unitText}>{unit.unitType} {unit.unitNumber}</Text>
                     <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
                     {unit.specifics?.length > 0 && (
                       <View style={styles.specificsContainer}>
@@ -83,17 +131,17 @@ const Report = () => {
                         ))}
                       </View>
                     )}
-                  </View>
+                  </TouchableOpacity>
                 ))}
-              </View>
-            ))}
-            <TouchableOpacity onPress={handleCloseModal} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </SafeAreaView>
-        )}
-      </Modal>
-    </ScrollView>
+              </ScrollView>
+              <TouchableOpacity onPress={handleCloseModal} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </SafeAreaView>
+          )}
+        </Modal>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -107,6 +155,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 15,
+    textAlign: "center",
   },
   fleetCard: {
     width: "100%",
@@ -137,6 +186,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "gray",
   },
+  progressBar: {
+    width: "100%",
+    height: 10,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 5,
+    marginTop: 10,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "green",
+  },
+  progressText: {
+    fontSize: 12,
+    marginTop: 5,
+    textAlign: "center",
+    fontWeight: "bold",
+  },
   modalContainer: {
     flex: 1,
     justifyContent: "flex-start",
@@ -153,6 +220,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#f9f9f9",
     borderRadius: 5,
     marginBottom: 10,
+  },
+  completedUnit: {
+    backgroundColor: "#d4edda",
   },
   unitText: {
     fontSize: 16,
