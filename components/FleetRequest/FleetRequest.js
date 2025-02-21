@@ -1,11 +1,10 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal} from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { db } from "../../utilis/Firebase";
 import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import Specifics from "./Specifics";
-
-
 
 const FleetRequest = () => {
   const [openUnitType, setOpenUnitType] = useState(false);
@@ -26,9 +25,18 @@ const FleetRequest = () => {
   const [unitNumber, setUnitNumber] = useState("");
   const [fleetDate, setFleetDate] = useState(null);
   const [units, setUnits] = useState([]);
-  const [unitSpecifics, setUnitSpecifics] = useState({}); // Store specifics per unit
+  const [unitSpecifics, setUnitSpecifics] = useState({});
   const [selectedUnitIndex, setSelectedUnitIndex] = useState(null);
   const [isSpecificsVisible, setIsSpecificsVisible] = useState(false);
+  const [userId, setUserId] = useState(null);
+
+  useEffect(() => {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      setUserId(currentUser.uid);
+    }
+  }, []);
 
   const handleAdd = () => {
     if (!unitType || !unitNumber || !urgency) {
@@ -61,34 +69,40 @@ const FleetRequest = () => {
   };
 
   const handleSubmit = async () => {
+    if (!userId) {
+      Alert.alert("Error", "You must be logged in to submit a fleet.");
+      return;
+    }
+
     if (units.length === 0) {
       Alert.alert("No Units", "Please add at least one unit before submitting.");
       return;
     }
-  
+
     try {
       const fleetRef = collection(db, "fleets");
-  
-      // Check if a fleet already exists for the selected date
-      const q = query(fleetRef, where("fleetDate", "==", fleetDate));
+
+      // Check if a fleet already exists for the selected date and user
+      const q = query(fleetRef, where("fleetDate", "==", fleetDate), where("userId", "==", userId));
       const querySnapshot = await getDocs(q);
-  
+
       if (!querySnapshot.empty) {
         // Fleet already exists, update the document
         const fleetDoc = querySnapshot.docs[0]; // Get the first matching document
         const existingUnits = fleetDoc.data().units || [];
-  
+
         await updateDoc(doc(db, "fleets", fleetDoc.id), {
           units: [...existingUnits, ...units.map((unit, index) => ({
             ...unit,
             specifics: unitSpecifics[index] || [],
           }))],
         });
-  
+
         Alert.alert("Success", "Fleet updated successfully!");
       } else {
         // Fleet does not exist, create a new document
         await addDoc(fleetRef, {
+          userId, // Associate fleet with user
           fleetDate,
           units: units.map((unit, index) => ({
             ...unit,
@@ -96,30 +110,18 @@ const FleetRequest = () => {
           })),
           timestamp: new Date(),
         });
-  
+
         Alert.alert("Success", "Fleet created successfully!");
       }
-  
+
       // Clear form after submission
       setUnits([]);
       setFleetDate(null);
       setUnitSpecifics({});
-  
     } catch (error) {
       console.error("Error submitting fleet:", error);
       Alert.alert("Error", "Could not submit fleet. Please try again.");
     }
-  };
-
-
-  const handleDoneSpecifics = (specifics) => {
-    if (selectedUnitIndex !== null) {
-      setUnitSpecifics((prev) => ({
-        ...prev,
-        [selectedUnitIndex]: specifics, // Replace existing instead of appending
-      }));
-    }
-    setIsSpecificsVisible(false);
   };
 
   return (
@@ -169,33 +171,6 @@ const FleetRequest = () => {
             </TouchableOpacity>
             <Text style={styles.unitText}>{unit.unitType}# {unit.unitNumber}</Text>
             <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
-
-            {unitSpecifics[index] && (
-              <View style={{ marginTop: 10 }}>
-                <Text style={styles.unitText}>Specifics:</Text>
-                {unitSpecifics[index].map((specific, i) => (
-                  <Text key={i} style={styles.unitText}>
-                    {specific.position} - {specific.ServiceType} - {specific.treadDepth} - {specific.selectedTire}
-                  </Text>
-                ))}
-              </View>
-            )}
-
-<View style={styles.cardBottomContainer}>
-              <TouchableOpacity style={styles.addSpecificsButton} >
-                <Text style={styles.addSpecificsText}>Upload Image</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-  style={styles.addSpecificsButton}
-  onPress={() => {
-    setSelectedUnitIndex(index); // Track which unit is being edited
-    setIsSpecificsVisible(true);
-  }}
->
-  <Text style={styles.addSpecificsText}>Add Specifics</Text>
-</TouchableOpacity>
-            </View>
-          
           </View>
         ))}
       </ScrollView>
@@ -203,19 +178,10 @@ const FleetRequest = () => {
       <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
         <Text style={styles.submitButtonText}>Submit Fleet</Text>
       </TouchableOpacity>
-
-      <Modal
-        visible={isSpecificsVisible}
-        animationType="slide"
-        onRequestClose={() => setIsSpecificsVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Specifics onDone={handleDoneSpecifics} />
-        </View>
-      </Modal>
     </View>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -259,43 +225,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  unitsContainer: {
-    width: "100%",
-    marginTop: 20,
-  },
-  unitCard: {
-    width: 350,
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    position: "relative",
-  },
-  unitText: {
-    fontSize: 16,
-  },
-  deleteButton: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    backgroundColor: "red",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  deleteButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
   submitButton: {
     backgroundColor: "green",
     padding: 15,
@@ -307,48 +236,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: "#fff",
     fontSize: 18,
-    fontWeight: "bold",
-  },
-  cardBottomContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-  addSpecificsButton: {
-    backgroundColor: "#007bff",
-    padding: 8,
-    borderRadius: 5,
-    flex: 1,
-    alignItems: "center",
-    marginLeft: 5,
-  },
-  addSpecificsText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  image: {
-    width: 100,
-    height: 100,
-    marginTop: 10,
-    borderRadius: 8,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "white",
-    padding: 20,
-  },
-  closeButton: {
-    backgroundColor: "red",
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 20,
-  },
-  closeButtonText: {
-    color: "#fff",
-    fontSize: 16,
     fontWeight: "bold",
   },
 });
