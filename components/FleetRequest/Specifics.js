@@ -185,7 +185,7 @@ const handleDonePress = async () => {
                     <DropDownPicker
                         open={openTireOptions}
                         value={selectedTire}
-                        items={[...tireOptions, { label: 'Add Tire (Type Manually)', value: 'custom' }]}
+                        items={[{ label: 'None', value: 'None' },{ label: 'Add Tire (Type Manually)', value: 'custom' }, ...tireOptions, ]}
                         setOpen={setOpenTireOptions}
                         setValue={setSelectedTire}
                         setItems={setTireOptions}
