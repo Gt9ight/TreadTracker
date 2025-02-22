@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal } from "react-native";
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, Image } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
-import { db } from "../../utilis/Firebase";
+import { db, storage } from "../../utilis/Firebase";
 import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { getAuth } from "firebase/auth";
+import * as ImagePicker from "expo-image-picker";
 import Specifics from "./Specifics";
 
 const FleetRequest = () => {
   const [openUnitType, setOpenUnitType] = useState(false);
   const [unitType, setUnitType] = useState(null);
+  const [unitImages, setUnitImages] = useState({});
   const [unitOptions, setUnitOptions] = useState([
     { label: "Truck", value: "Truck" },
     { label: "Trailer", value: "Trailer" },
@@ -82,31 +85,30 @@ const FleetRequest = () => {
     try {
       const fleetRef = collection(db, "fleets");
 
-      // Check if a fleet already exists for the selected date and user
       const q = query(fleetRef, where("fleetDate", "==", fleetDate), where("userId", "==", userId));
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
-        // Fleet already exists, update the document
-        const fleetDoc = querySnapshot.docs[0]; // Get the first matching document
+        const fleetDoc = querySnapshot.docs[0];
         const existingUnits = fleetDoc.data().units || [];
 
         await updateDoc(doc(db, "fleets", fleetDoc.id), {
           units: [...existingUnits, ...units.map((unit, index) => ({
             ...unit,
             specifics: unitSpecifics[index] || [],
+            imageUrl: unitImages[index] || null,
           }))],
         });
 
         Alert.alert("Success", "Fleet updated successfully!");
       } else {
-        // Fleet does not exist, create a new document
         await addDoc(fleetRef, {
-          userId, // Associate fleet with user
+          userId,
           fleetDate,
           units: units.map((unit, index) => ({
             ...unit,
             specifics: unitSpecifics[index] || [],
+            imageUrl: unitImages[index] || null,
           })),
           timestamp: new Date(),
         });
@@ -114,10 +116,10 @@ const FleetRequest = () => {
         Alert.alert("Success", "Fleet created successfully!");
       }
 
-      // Clear form after submission
       setUnits([]);
       setFleetDate(null);
       setUnitSpecifics({});
+      setUnitImages({});
     } catch (error) {
       console.error("Error submitting fleet:", error);
       Alert.alert("Error", "Could not submit fleet. Please try again.");
@@ -134,6 +136,101 @@ const FleetRequest = () => {
     setIsSpecificsVisible(false);
   };
 
+
+  const pickImage = async (index) => {
+    // Request permissions for camera and media library
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+    const libraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  
+    // Check if permissions are granted
+    if (cameraPermission.granted && libraryPermission.granted) {
+      // Show an alert to ask the user whether they want to use the camera or the photo library
+      const result = await Alert.alert(
+        "Choose Image Source",
+        "Would you like to take a photo or select one from the library?",
+        [
+          {
+            text: "Use Camera",
+            onPress: async () => {
+              let cameraResult = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 1,
+              });
+              if (!cameraResult.canceled) {
+                uploadImage(cameraResult.assets[0].uri, index);
+              }
+            },
+          },
+          {
+            text: "Choose from Library",
+            onPress: async () => {
+              let libraryResult = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 1,
+              });
+              if (!libraryResult.canceled) {
+                uploadImage(libraryResult.assets[0].uri, index);
+              }
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]
+      );
+    } else {
+      // If permission is denied, show an alert to inform the user
+      Alert.alert(
+        "Permissions Required",
+        "Camera and/or media library permissions are required to use this feature.",
+        [{ text: "OK" }]
+      );
+    }
+  };
+
+  // Function to upload image to Firebase Storage
+  const uploadImage = async (imageUri, index) => {
+    try {
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const imageRef = ref(storage, `unitImages/${Date.now()}_${userId}.jpg`);
+      const uploadTask = uploadBytesResumable(imageRef, blob);
+  
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          console.log(`Uploading: ${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`);
+        },
+        (error) => {
+          console.error("Upload error: ", error);
+          Alert.alert("Upload Error", "Failed to upload image.");
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+  
+          // Update the unitImages state to append the new image to the existing ones
+          setUnitImages((prev) => {
+            const newImages = { ...prev };
+            if (newImages[index]) {
+              // If the unit already has images, add the new one to the array
+              newImages[index].push(downloadURL);
+            } else {
+              // If no images exist, create an array with the new image
+              newImages[index] = [downloadURL];
+            }
+            return newImages;
+          });
+        }
+      );
+    } catch (error) {
+      console.error("Error uploading image: ", error);
+      Alert.alert("Error", "Could not upload image. Please try again.");
+    }
+  };
   return (
     <View style={styles.container}>
       <Text style={styles.fleetTitle}>
@@ -182,6 +279,8 @@ const FleetRequest = () => {
             <Text style={styles.unitText}>{unit.unitType}# {unit.unitNumber}</Text>
             <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
 
+
+
             {unitSpecifics[index] && (
               <View style={{ marginTop: 10 }}>
                 <Text style={styles.unitText}>Specifics:</Text>
@@ -192,9 +291,12 @@ const FleetRequest = () => {
                 ))}
               </View>
             )}
+{unitImages[index] && unitImages[index].map((imageUri, imgIndex) => (
+  <Image key={imgIndex} source={{ uri: imageUri }} style={styles.unitImage} />
+))}
 
 <View style={styles.cardBottomContainer}>
-              <TouchableOpacity style={styles.addSpecificsButton} >
+              <TouchableOpacity style={styles.addSpecificsButton}  onPress={() => pickImage(index)} >
                 <Text style={styles.addSpecificsText}>Upload Image</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -280,6 +382,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
     marginTop: 20,
+  },
+  unitImage: {
+    width: "100%",
+    height: 150,
+    borderRadius: 8,
+    marginTop: 10,
   },
   submitButtonText: {
     color: "#fff",
