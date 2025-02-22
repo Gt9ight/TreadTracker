@@ -202,25 +202,24 @@ const handleDonePress = async () => {
                 </View>
 
                 {isTyping && (
-                    <View style={{ marginBottom: 15 }}>
-                        <TextInput
-                            placeholder="Enter Tire Needed"
-                            style={{
-                                borderWidth: 1,
-                                borderColor: '#ccc',
-                                borderRadius: 8,
-                                padding: 10,
-                                marginBottom: 10,
-                            }}
-                            value={customTire}
-                            onChangeText={setCustomTire}
-                        />
-                        <Button title="Save Tire" onPress={addCustomTire} />
-                    </View>
-                )}
+    <View style={styles.customTireContainer}>
+        <TextInput
+            placeholder="Enter Tire Needed"
+            placeholderTextColor="#888" // Ensures visibility
+            style={styles.customTireInput}
+            value={customTire}
+            onChangeText={setCustomTire}
+        />
+        <TouchableOpacity onPress={addCustomTire} style={styles.saveTireButton}>
+            <Text style={styles.buttonText}>Save Tire</Text>
+        </TouchableOpacity>
+    </View>
+)}
 
                 {/* Add Specifics Button */}
-                <Button title="Add Specifics" onPress={addSpecifics} />
+                <TouchableOpacity onPress={addSpecifics} style={styles.addButton}>
+    <Text style={styles.buttonText}>Add Specifics</Text>
+</TouchableOpacity>
 
                 {/* Display Specifics */}
                 <ScrollView style={{ marginTop: 15 }}>
@@ -242,12 +241,66 @@ const handleDonePress = async () => {
                     ))}
                 </ScrollView>
                 
-                <TouchableOpacity onPress={handleDonePress}>
-                    <Text>Done</Text>
-                </TouchableOpacity>
+                <TouchableOpacity onPress={handleDonePress} style={styles.doneButton}>
+    <Text style={styles.buttonText}>Done</Text>
+</TouchableOpacity>
             </View>
         </SafeAreaView>
     );
+};
+
+const styles = {
+    addButton: {
+        backgroundColor: '#007bff', // Primary blue
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        marginVertical: 10,
+    },
+    doneButton: {
+        backgroundColor: '#28a745', // Success green
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        marginVertical: 20,
+    },
+    buttonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    customTireContainer: {
+        marginBottom: 15,
+        padding: 10,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 10,
+    },
+    customTireInput: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 16,
+        color: '#333', // Ensures text is readable
+        backgroundColor: 'white', // Makes sure placeholder stands out
+        textAlign: 'center',
+        
+    },
+    saveTireButton: {
+        backgroundColor: '#007bff',
+        paddingVertical: 10,
+        marginTop: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
 };
 
 export default Specifics;

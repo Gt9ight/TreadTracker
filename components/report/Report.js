@@ -96,7 +96,7 @@ const Report = () => {
               <ScrollView>
                 {selectedFleet.flatMap((fleet) => fleet.units).map((unit, unitIndex) => (
                   <View key={unitIndex} style={styles.unitContainer}>
-                    <Text style={styles.unitText}>{unit.unitType} {unit.unitNumber}</Text>
+                    <Text style={styles.unitText}>{unit.unitType}#: {unit.unitNumber}</Text>
                     <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
                     {unit.specifics?.length > 0 && (
                       <View style={styles.specificsContainer}>
