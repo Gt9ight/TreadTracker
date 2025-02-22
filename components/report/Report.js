@@ -1,12 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { 
   View, Text, ScrollView, StyleSheet, ActivityIndicator, 
-  TouchableOpacity, Modal 
+  TouchableOpacity, Modal, Image 
 } from "react-native";
 import { collection, onSnapshot } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage, ref, getDownloadURL } from "firebase/storage";
 import { db } from "../../utilis/Firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const fetchImageUrl = async (imagePath) => {
+  try {
+    const storage = getStorage();
+    const imageRef = ref(storage, imagePath);
+    return await getDownloadURL(imageRef);
+  } catch (error) {
+    console.error("Error fetching image URL:", error);
+    return null;
+  }
+};
 
 const Report = () => {
   const [fleets, setFleets] = useState({});
@@ -25,15 +37,24 @@ const Report = () => {
 
     setUser(currentUser);
 
-    const unsubscribe = onSnapshot(collection(db, "fleets"), (snapshot) => {
-      const fleetData = snapshot.docs
-        .map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-        .filter((fleet) => fleet.userId === currentUser.uid); // Only show logged-in user's fleets
+    const unsubscribe = onSnapshot(collection(db, "fleets"), async (snapshot) => {
+      const fleetData = await Promise.all(snapshot.docs.map(async (doc) => {
+        const data = doc.data();
+        if (data.units) {
+          const updatedUnits = await Promise.all(
+            data.units.map(async (unit) => {
+              if (unit.imageUrl) {
+                unit.imageUrl = await fetchImageUrl(unit.imageUrl);
+              }
+              return unit;
+            })
+          );
+          data.units = updatedUnits;
+        }
+        return { id: doc.id, ...data };
+      }));
 
-      setFleets(groupByDate(fleetData));
+      setFleets(groupByDate(fleetData.filter((fleet) => fleet.userId === currentUser.uid)));
       setLoading(false);
     });
 
@@ -98,16 +119,14 @@ const Report = () => {
                   <View key={unitIndex} style={styles.unitContainer}>
                     <Text style={styles.unitText}>{unit.unitType}#:{unit.unitNumber}</Text>
                     <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
-                    {unit.specifics?.length > 0 && (
-                      <View style={styles.specificsContainer}>
-                        <Text style={styles.specificsTitle}>Specifics:</Text>
-                        {unit.specifics.map((specific, i) => (
-                          <Text key={i} style={styles.specificText}>
-                            {specific.position} - {specific.ServiceType} - {specific.treadDepth} - {specific.selectedTire}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
+                    {Array.isArray(unit.imageUrl) ? (
+  unit.imageUrl.map((url, index) => (
+    <Image key={index} source={{ uri: url }} style={styles.unitImage} />
+  ))
+) : (
+  unit.imageUrl && <Image source={{ uri: unit.imageUrl }} style={styles.unitImage} />
+)}
+
                   </View>
                 ))}
               </ScrollView>
@@ -121,7 +140,6 @@ const Report = () => {
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     padding: 20,
@@ -184,6 +202,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 5,
   },
+unitImage: {
+  width: 120, // Adjusted width
+  height: 90, // Adjusted height
+  borderRadius: 8,
+  marginTop: 10,
+},
   specificsContainer: {
     marginTop: 5,
   },
@@ -206,5 +230,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
-
 export default Report;
