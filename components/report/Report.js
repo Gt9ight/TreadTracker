@@ -9,16 +9,26 @@ import { getStorage, ref, getDownloadURL } from "firebase/storage";
 import { db } from "../../utilis/Firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const fetchImageUrl = async (imagePath) => {
+
+const fetchImageUrls = async (imagePaths) => {
   try {
     const storage = getStorage();
-    const imageRef = ref(storage, imagePath);
-    return await getDownloadURL(imageRef);
+    if (Array.isArray(imagePaths)) {
+      return await Promise.all(imagePaths.map(async (path) => {
+        const imageRef = ref(storage, path);
+        return await getDownloadURL(imageRef);
+      }));
+    } else {
+      // Handle the case where only one image path is stored as a string
+      const imageRef = ref(storage, imagePaths);
+      return [await getDownloadURL(imageRef)];
+    }
   } catch (error) {
-    console.error("Error fetching image URL:", error);
-    return null;
+    console.error("Error fetching image URLs:", error);
+    return [];
   }
 };
+
 
 const Report = () => {
   const [fleets, setFleets] = useState({});
@@ -44,7 +54,7 @@ const Report = () => {
           const updatedUnits = await Promise.all(
             data.units.map(async (unit) => {
               if (unit.imageUrl) {
-                unit.imageUrl = await fetchImageUrl(unit.imageUrl);
+                unit.imageUrl = await fetchImageUrls(unit.imageUrl);
               }
               return unit;
             })
@@ -53,7 +63,7 @@ const Report = () => {
         }
         return { id: doc.id, ...data };
       }));
-
+    
       setFleets(groupByDate(fleetData.filter((fleet) => fleet.userId === currentUser.uid)));
       setLoading(false);
     });
@@ -104,7 +114,7 @@ const Report = () => {
 
   return (
     <SafeAreaView>
-      <Text style={styles.title}>Fleet List</Text>
+      <Text style={styles.title}>Fleet Report</Text>
       <ScrollView contentContainerStyle={styles.container}>
         {Object.keys(fleets).length === 0 ? (
           <Text style={styles.noData}>No fleets available.</Text>
@@ -145,13 +155,14 @@ const Report = () => {
                   <View key={unitIndex} style={getUnitCardStyle(unit)}>
                     <Text style={styles.unitText}>{unit.unitType}#:{unit.unitNumber}</Text>
                     <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
-                    {Array.isArray(unit.imageUrl) ? (
-                      unit.imageUrl.map((url, index) => (
-                        <Image key={index} source={{ uri: url }} style={styles.unitImage} />
-                      ))
-                    ) : (
-                      unit.imageUrl && <Image source={{ uri: unit.imageUrl }} style={styles.unitImage} />
-                    )}
+                    {unit.imageUrl && unit.imageUrl.length > 0 && (
+  <ScrollView horizontal>
+    {unit.imageUrl.map((url, index) => (
+      <Image key={index} source={{ uri: url }} style={styles.unitImage} />
+    ))}
+  </ScrollView>
+)}
+
                   </View>
                 ))}
               </ScrollView>
@@ -240,6 +251,7 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 8,
     marginTop: 10,
+    marginRight: 10,
   },
   specificsContainer: {
     marginTop: 5,
@@ -279,7 +291,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#4cbb17nb ",
+    backgroundColor: "#4cbb17",
     borderRadius: 5,
   },
 });
