@@ -80,6 +80,16 @@ const Report = () => {
     setSelectedFleet(null);
   };
 
+  const calculateProgress = (units) => {
+    const completedUnits = units.filter((unit) => unit.completed).length;
+    const totalUnits = units.length;
+    return totalUnits > 0 ? (completedUnits / totalUnits) * 100 : 0;
+  };
+
+  const getUnitCardStyle = (unit) => {
+    return unit.completed ? styles.completedUnitCard : styles.unitCard;
+  };
+
   if (loading) {
     return <ActivityIndicator size="large" color="#007bff" style={styles.loader} />;
   }
@@ -100,11 +110,27 @@ const Report = () => {
           <Text style={styles.noData}>No fleets available.</Text>
         ) : (
           Object.keys(fleets).map((fleetDate) => (
-            <TouchableOpacity key={fleetDate} onPress={() => handleFleetPress(fleets[fleetDate])} style={styles.fleetCard}>
+            <TouchableOpacity 
+              key={fleetDate} 
+              onPress={() => handleFleetPress(fleets[fleetDate])} 
+              style={styles.fleetCard}
+            >
               <Text style={styles.fleetDate}>Fleet Date: {fleetDate}</Text>
               <Text style={styles.unitCount}>
                 Units: {fleets[fleetDate].reduce((sum, fleet) => sum + (fleet.units?.length || 0), 0)}
               </Text>
+              {/* Progress Bar */}
+              {fleets[fleetDate].map((fleet) => {
+                const progress = calculateProgress(fleet.units);
+                return (
+                  <View key={fleet.id} style={styles.progressBarContainer}>
+                    <Text style={styles.progressText}>Progress: {Math.round(progress)}%</Text>
+                    <View style={styles.progressBarBackground}>
+                      <View style={[styles.progressBar, { width: `${progress}%` }]} />
+                    </View>
+                  </View>
+                );
+              })}
             </TouchableOpacity>
           ))
         )}
@@ -116,17 +142,16 @@ const Report = () => {
               <Text style={styles.modalTitle}>Fleet Details</Text>
               <ScrollView>
                 {selectedFleet.flatMap((fleet) => fleet.units).map((unit, unitIndex) => (
-                  <View key={unitIndex} style={styles.unitContainer}>
+                  <View key={unitIndex} style={getUnitCardStyle(unit)}>
                     <Text style={styles.unitText}>{unit.unitType}#:{unit.unitNumber}</Text>
                     <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
                     {Array.isArray(unit.imageUrl) ? (
-  unit.imageUrl.map((url, index) => (
-    <Image key={index} source={{ uri: url }} style={styles.unitImage} />
-  ))
-) : (
-  unit.imageUrl && <Image source={{ uri: unit.imageUrl }} style={styles.unitImage} />
-)}
-
+                      unit.imageUrl.map((url, index) => (
+                        <Image key={index} source={{ uri: url }} style={styles.unitImage} />
+                      ))
+                    ) : (
+                      unit.imageUrl && <Image source={{ uri: unit.imageUrl }} style={styles.unitImage} />
+                    )}
                   </View>
                 ))}
               </ScrollView>
@@ -140,6 +165,7 @@ const Report = () => {
     </SafeAreaView>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     padding: 20,
@@ -192,22 +218,29 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 15,
   },
-  unitContainer: {
+  unitCard: {
     padding: 10,
     backgroundColor: "#f9f9f9",
     borderRadius: 5,
     marginBottom: 10,
   },
+  completedUnitCard: {
+    padding: 10,
+    backgroundColor: "#72bf6a", // Green background for completed units
+    borderRadius: 5,
+    marginBottom: 10,
+    color: 'white'
+  },
   unitText: {
     fontSize: 16,
     marginBottom: 5,
   },
-unitImage: {
-  width: 120, // Adjusted width
-  height: 90, // Adjusted height
-  borderRadius: 8,
-  marginTop: 10,
-},
+  unitImage: {
+    width: 120,
+    height: 90,
+    borderRadius: 8,
+    marginTop: 10,
+  },
   specificsContainer: {
     marginTop: 5,
   },
@@ -229,5 +262,26 @@ unitImage: {
     fontSize: 16,
     fontWeight: "bold",
   },
+  progressBarContainer: {
+    marginTop: 10,
+    width: "100%",
+  },
+  progressText: {
+    fontSize: 16,
+    marginBottom: 5,
+    color: "#007bff",
+  },
+  progressBarBackground: {
+    width: "100%",
+    height: 10,
+    backgroundColor: "#ddd",
+    borderRadius: 5,
+  },
+  progressBar: {
+    height: "100%",
+    backgroundColor: "#4cbb17nb ",
+    borderRadius: 5,
+  },
 });
+
 export default Report;
