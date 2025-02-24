@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, 
   TouchableOpacity, Modal, Image 
 } from "react-native";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot,doc, updateDoc, getDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage, ref, getDownloadURL } from "firebase/storage";
 import { db } from "../../utilis/Firebase";
@@ -44,9 +44,9 @@ const Report = () => {
       setLoading(false);
       return;
     }
-
+  
     setUser(currentUser);
-
+  
     const unsubscribe = onSnapshot(collection(db, "fleets"), async (snapshot) => {
       const fleetData = await Promise.all(snapshot.docs.map(async (doc) => {
         const data = doc.data();
@@ -56,20 +56,21 @@ const Report = () => {
               if (unit.imageUrl) {
                 unit.imageUrl = await fetchImageUrls(unit.imageUrl);
               }
-              return unit;
+              return { ...unit }; // Ensure new reference to trigger re-render
             })
           );
           data.units = updatedUnits;
         }
         return { id: doc.id, ...data };
       }));
-    
+  
       setFleets(groupByDate(fleetData.filter((fleet) => fleet.userId === currentUser.uid)));
       setLoading(false);
     });
-
+  
     return () => unsubscribe();
   }, []);
+  
 
   const groupByDate = (fleets) => {
     return fleets.reduce((acc, fleet) => {
@@ -112,6 +113,59 @@ const Report = () => {
     );
   }
 
+  const markUnitComplete = async (fleetId, unitIndex) => {
+    try {
+      const fleetRef = doc(db, "fleets", fleetId);
+      const fleetSnapshot = await getDoc(fleetRef);
+  
+      if (!fleetSnapshot.exists()) {
+        console.error("Fleet not found!");
+        return;
+      }
+  
+      const fleetData = fleetSnapshot.data();
+  
+      // Toggle completion status of the specific unit
+      const updatedUnits = fleetData.units.map((unit, index) =>
+        index === unitIndex ? { ...unit, completed: !unit.completed } : unit
+      );
+  
+      // Update Firebase
+      await updateDoc(fleetRef, { units: updatedUnits });
+  
+      // Update local state to trigger re-render
+      setFleets((prevFleets) => {
+        const newFleets = { ...prevFleets };
+  
+        Object.keys(newFleets).forEach((date) => {
+          newFleets[date] = newFleets[date].map((fleet) => {
+            if (fleet.id === fleetId) {
+              return { ...fleet, units: updatedUnits }; // Create a new object reference
+            }
+            return fleet;
+          });
+        });
+  
+        return newFleets;
+      });
+  
+      // **Update the modal content immediately**
+      if (selectedFleet) {
+        setSelectedFleet((prevSelectedFleet) =>
+          prevSelectedFleet.map((fleet) =>
+            fleet.id === fleetId ? { ...fleet, units: updatedUnits } : fleet
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error updating unit:", error);
+    }
+  };
+  
+  
+  
+  
+
   return (
     <SafeAreaView>
       <Text style={styles.title}>Fleet Report</Text>
@@ -151,20 +205,35 @@ const Report = () => {
             <SafeAreaView style={styles.modalContainer}>
               <Text style={styles.modalTitle}>Fleet Details</Text>
               <ScrollView>
-                {selectedFleet.flatMap((fleet) => fleet.units).map((unit, unitIndex) => (
-                  <View key={unitIndex} style={getUnitCardStyle(unit)}>
-                    <Text style={styles.unitText}>{unit.unitType}#:{unit.unitNumber}</Text>
-                    <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
-                    {unit.imageUrl && unit.imageUrl.length > 0 && (
-  <ScrollView horizontal>
-    {unit.imageUrl.map((url, index) => (
-      <Image key={index} source={{ uri: url }} style={styles.unitImage} />
-    ))}
-  </ScrollView>
+              {selectedFleet.map((fleet) => 
+  fleet.units.map((unit, unitIndex) => (
+    <View key={unitIndex} style={getUnitCardStyle(unit)}>
+      <Text style={styles.unitText}>{unit.unitType}#: {unit.unitNumber}</Text>
+      <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
+
+      {unit.imageUrl && unit.imageUrl.length > 0 && (
+        <ScrollView horizontal>
+          {unit.imageUrl.map((url, index) => (
+            <Image key={index} source={{ uri: url }} style={styles.unitImage} />
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Fix: Ensure fleet.id is passed correctly */}
+      <TouchableOpacity 
+  onPress={() => markUnitComplete(fleet.id, unitIndex)} 
+  style={styles.completeButton}
+>
+  <Text style={styles.completeButtonText}>
+    {unit.completed ? "Completed" : "Mark Complete"}
+  </Text>
+</TouchableOpacity>
+
+
+    </View>
+  ))
 )}
 
-                  </View>
-                ))}
               </ScrollView>
               <TouchableOpacity onPress={handleCloseModal} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>Close</Text>
@@ -294,6 +363,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#4cbb17",
     borderRadius: 5,
   },
+  completeButton: {
+    backgroundColor: "#4cbb17",
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  completeButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  
 });
 
 export default Report;
