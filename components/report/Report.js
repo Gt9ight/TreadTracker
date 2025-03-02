@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { 
   View, Text, ScrollView, StyleSheet, ActivityIndicator, 
-  TouchableOpacity, Modal, Image 
+  TouchableOpacity, Modal, Image, TextInput 
 } from "react-native";
 import { collection, onSnapshot,doc, updateDoc, getDoc, deleteDoc, getDocs } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getAuth, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { getStorage, ref, getDownloadURL, deleteObject } from "firebase/storage";
 import { db,storage } from "../../utilis/Firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,6 +35,9 @@ const Report = () => {
   const [loading, setLoading] = useState(true);
   const [selectedFleet, setSelectedFleet] = useState(null);
   const [user, setUser] = useState(null);
+  const [password, setPassword] = useState("");
+  const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
+  const [fleetToDelete, setFleetToDelete] = useState(null);
 
   useEffect(() => {
     const auth = getAuth();
@@ -165,10 +168,20 @@ const Report = () => {
   
 
 
-  const deleteFleet = async (fleetId, imageUrls) => {
+  const deleteFleet = async () => {
     try {
-      if (imageUrls && Array.isArray(imageUrls)) {
-        await Promise.all(imageUrls.map(async (imageUrl) => {
+      const auth = getAuth();
+      const user = auth.currentUser;
+  
+      if (!user || !fleetToDelete) return;
+  
+      // Re-authenticate the user
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, credential);
+  
+      // Proceed with fleet deletion
+      if (fleetToDelete.imageUrls && Array.isArray(fleetToDelete.imageUrls)) {
+        await Promise.all(fleetToDelete.imageUrls.map(async (imageUrl) => {
           try {
             const path = decodeURIComponent(imageUrl.split("/o/")[1].split("?")[0]);
             const imageRef = ref(storage, path);
@@ -178,16 +191,26 @@ const Report = () => {
           }
         }));
       }
-      await deleteDoc(doc(db, "fleets", fleetId));
+  
+      await deleteDoc(doc(db, "fleets", fleetToDelete.id));
+  
+      // Update local state
       setFleets((prevFleets) => {
         const newFleets = { ...prevFleets };
         Object.keys(newFleets).forEach((date) => {
-          newFleets[date] = newFleets[date].filter((fleet) => fleet.id !== fleetId);
+          newFleets[date] = newFleets[date].filter((fleet) => fleet.id !== fleetToDelete.id);
         });
         return newFleets;
       });
+  
+      // Reset states
+      setIsPasswordModalVisible(false);
+      setFleetToDelete(null);
+      setPassword("");
+  
     } catch (error) {
       console.error("Error deleting fleet:", error);
+      alert("Incorrect password. Please try again.");
     }
   };
 
@@ -207,11 +230,18 @@ const Report = () => {
               onPress={() => handleFleetPress(fleets[fleetDate])} 
               style={styles.fleetCard}
             >
-              <TouchableOpacity onPress={() => {
-                fleets[fleetDate].forEach(fleet => deleteFleet(fleet.id, fleet.units?.flatMap(unit => unit.imageUrl || [])));
-              }} style={styles.deleteButton}>
-                <Text style={styles.deleteButtonText}>Delete Fleet</Text>
-              </TouchableOpacity>
+<TouchableOpacity 
+  onPress={() => {
+    setFleetToDelete({
+      id: fleets[fleetDate][0].id, 
+      imageUrls: fleets[fleetDate].flatMap(fleet => fleet.units?.flatMap(unit => unit.imageUrl || []))
+    });
+    setIsPasswordModalVisible(true);
+  }} 
+  style={styles.deleteButton}
+>
+  <Text style={styles.deleteButtonText}>Delete Fleet</Text>
+</TouchableOpacity>
 
               <Text style={styles.fleetDate}>Fleet Date: {fleetDate}</Text>
               <Text style={styles.unitCount}>
@@ -232,6 +262,29 @@ const Report = () => {
             </TouchableOpacity>
           ))
         )}
+
+<Modal visible={isPasswordModalVisible} animationType="slide" transparent={true}>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Enter Password to Delete</Text>
+      <TextInput 
+        style={styles.passwordInput} 
+        secureTextEntry 
+        placeholder="Enter your password" 
+        value={password} 
+        onChangeText={setPassword} 
+      />
+      <View style={styles.modalButtons}>
+        <TouchableOpacity onPress={deleteFleet} style={styles.confirmButton}>
+          <Text style={styles.confirmButtonText}>Confirm</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setIsPasswordModalVisible(false)} style={styles.cancelButton}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
 
         {/* Fleet Details Modal */}
         <Modal visible={selectedFleet !== null} animationType="slide" onRequestClose={handleCloseModal}>
@@ -418,6 +471,50 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: "#fff",
     fontSize: 16,
+    fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  passwordInput: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 5,
+    padding: 10,
+    marginTop: 10,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    marginTop: 15,
+  },
+  confirmButton: {
+    backgroundColor: "red",
+    padding: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  confirmButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  cancelButton: {
+    backgroundColor: "gray",
+    padding: 10,
+    borderRadius: 5,
+  },
+  cancelButtonText: {
+    color: "#fff",
     fontWeight: "bold",
   },
   
