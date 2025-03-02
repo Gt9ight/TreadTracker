@@ -297,6 +297,16 @@ const Report = () => {
     <View key={unitIndex} style={getUnitCardStyle(unit)}>
       <Text style={styles.unitText}>{unit.unitType}#: {unit.unitNumber}</Text>
       <Text style={styles.unitText}>Urgency: {unit.urgency}</Text>
+      {unit.specifics?.length > 0 && (
+                      <View style={styles.specificsContainer}>
+                        <Text style={styles.specificsTitle}>Specifics:</Text>
+                        {unit.specifics.map((specific, i) => (
+                          <Text key={i} style={styles.specificText}>
+                            {specific.position} - {specific.ServiceType} - {specific.treadDepth} - {specific.selectedTire}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
 
       {unit.imageUrl && unit.imageUrl.length > 0 && (
         <ScrollView horizontal>
