@@ -3,10 +3,10 @@ import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, 
   TouchableOpacity, Modal, Image 
 } from "react-native";
-import { collection, onSnapshot,doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot,doc, updateDoc, getDoc, deleteDoc, getDocs } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getStorage, ref, getDownloadURL } from "firebase/storage";
-import { db } from "../../utilis/Firebase";
+import { getStorage, ref, getDownloadURL, deleteObject } from "firebase/storage";
+import { db,storage } from "../../utilis/Firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 
@@ -163,7 +163,35 @@ const Report = () => {
   };
   
   
-  
+
+
+  const deleteFleet = async (fleetId, imageUrls) => {
+    try {
+      if (imageUrls && Array.isArray(imageUrls)) {
+        await Promise.all(imageUrls.map(async (imageUrl) => {
+          try {
+            const path = decodeURIComponent(imageUrl.split("/o/")[1].split("?")[0]);
+            const imageRef = ref(storage, path);
+            await deleteObject(imageRef);
+          } catch (err) {
+            console.error(`Error deleting image ${imageUrl}:`, err);
+          }
+        }));
+      }
+      await deleteDoc(doc(db, "fleets", fleetId));
+      setFleets((prevFleets) => {
+        const newFleets = { ...prevFleets };
+        Object.keys(newFleets).forEach((date) => {
+          newFleets[date] = newFleets[date].filter((fleet) => fleet.id !== fleetId);
+        });
+        return newFleets;
+      });
+    } catch (error) {
+      console.error("Error deleting fleet:", error);
+    }
+  };
+
+
   
 
   return (
@@ -179,6 +207,12 @@ const Report = () => {
               onPress={() => handleFleetPress(fleets[fleetDate])} 
               style={styles.fleetCard}
             >
+              <TouchableOpacity onPress={() => {
+                fleets[fleetDate].forEach(fleet => deleteFleet(fleet.id, fleet.units?.flatMap(unit => unit.imageUrl || [])));
+              }} style={styles.deleteButton}>
+                <Text style={styles.deleteButtonText}>Delete Fleet</Text>
+              </TouchableOpacity>
+
               <Text style={styles.fleetDate}>Fleet Date: {fleetDate}</Text>
               <Text style={styles.unitCount}>
                 Units: {fleets[fleetDate].reduce((sum, fleet) => sum + (fleet.units?.length || 0), 0)}
@@ -372,6 +406,18 @@ const styles = StyleSheet.create({
   },
   completeButtonText: {
     color: "#fff",
+    fontWeight: "bold",
+  },
+  deleteButton: {
+    backgroundColor: "red",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 20,
+  },
+  deleteButtonText: {
+    color: "#fff",
+    fontSize: 16,
     fontWeight: "bold",
   },
   
