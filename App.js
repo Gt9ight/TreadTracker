@@ -6,7 +6,8 @@ import AuthScreen from './components/auth/AuthScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { auth } from './utilis/Firebase';
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import Admin from './components/auth/Admin';
 
 const Tab = createBottomTabNavigator();
 
@@ -24,14 +25,7 @@ export default function App() {
         <Tab.Navigator>
           <Tab.Screen name="Report" component={Report} />
           <Tab.Screen name="Fleet Request" component={FleetRequest} />
-          <Tab.Screen 
-            name="Logout" 
-            component={() => (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Button title="Logout" onPress={() => signOut(auth)} />
-              </View>
-            )} 
-          />
+          <Tab.Screen name="Admin" component={Admin} />
         </Tab.Navigator>
       ) : (
         <AuthScreen />
