@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { 
   View, Text, ScrollView, StyleSheet, ActivityIndicator, 
-  TouchableOpacity, Modal, Image, TextInput 
+  TouchableOpacity, Modal, Image, TextInput, Clipboard 
 } from "react-native";
 import { collection, onSnapshot,doc, updateDoc, getDoc, deleteDoc, getDocs } from "firebase/firestore";
 import { getAuth, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
@@ -214,7 +214,10 @@ const Report = () => {
     }
   };
 
-
+  const copyToClipboard = (uid) => {
+    Clipboard.setString(uid);  // Copy the UID to clipboard
+    alert("Fleet UID copied to clipboard!");  // Optional: Provide feedback to the user
+  };
   
 
   return (
@@ -225,41 +228,55 @@ const Report = () => {
           <Text style={styles.noData}>No fleets available.</Text>
         ) : (
           Object.keys(fleets).map((fleetDate) => (
-            <TouchableOpacity 
-              key={fleetDate} 
-              onPress={() => handleFleetPress(fleets[fleetDate])} 
-              style={styles.fleetCard}
-            >
 <TouchableOpacity 
-  onPress={() => {
-    setFleetToDelete({
-      id: fleets[fleetDate][0].id, 
-      imageUrls: fleets[fleetDate].flatMap(fleet => fleet.units?.flatMap(unit => unit.imageUrl || []))
-    });
-    setIsPasswordModalVisible(true);
-  }} 
-  style={styles.deleteButton}
+  key={fleetDate} 
+  onPress={() => handleFleetPress(fleets[fleetDate])} 
+  style={styles.fleetCard}
 >
-  <Text style={styles.deleteButtonText}>Delete Fleet</Text>
+  <TouchableOpacity 
+    onPress={() => {
+      setFleetToDelete({
+        id: fleets[fleetDate][0].id, 
+        imageUrls: fleets[fleetDate].flatMap(fleet => fleet.units?.flatMap(unit => unit.imageUrl || []))
+      });
+      setIsPasswordModalVisible(true);
+    }} 
+    style={styles.deleteButton}
+  >
+    <Text style={styles.deleteButtonText}>Delete Fleet</Text>
+  </TouchableOpacity>
+
+  <Text style={styles.fleetDate}>Fleet Date: {fleetDate}</Text>
+
+  {/* Display the fleet UID */}
+  <Text style={styles.fleetUID}>Fleet UID: {fleets[fleetDate][0].id}</Text>
+
+{/* Add a button to copy the UID */}
+<TouchableOpacity 
+  onPress={() => copyToClipboard(fleets[fleetDate][0].id)} 
+  style={styles.copyButton}
+>
+  <Text style={styles.copyButtonText}>Copy UID</Text>
 </TouchableOpacity>
 
-              <Text style={styles.fleetDate}>Fleet Date: {fleetDate}</Text>
-              <Text style={styles.unitCount}>
-                Units: {fleets[fleetDate].reduce((sum, fleet) => sum + (fleet.units?.length || 0), 0)}
-              </Text>
-              {/* Progress Bar */}
-              {fleets[fleetDate].map((fleet) => {
-                const progress = calculateProgress(fleet.units);
-                return (
-                  <View key={fleet.id} style={styles.progressBarContainer}>
-                    <Text style={styles.progressText}>Progress: {Math.round(progress)}%</Text>
-                    <View style={styles.progressBarBackground}>
-                      <View style={[styles.progressBar, { width: `${progress}%` }]} />
-                    </View>
-                  </View>
-                );
-              })}
-            </TouchableOpacity>
+  <Text style={styles.unitCount}>
+    Units: {fleets[fleetDate].reduce((sum, fleet) => sum + (fleet.units?.length || 0), 0)}
+  </Text>
+
+  {/* Progress Bar */}
+  {fleets[fleetDate].map((fleet) => {
+    const progress = calculateProgress(fleet.units);
+    return (
+      <View key={fleet.id} style={styles.progressBarContainer}>
+        <Text style={styles.progressText}>Progress: {Math.round(progress)}%</Text>
+        <View style={styles.progressBarBackground}>
+          <View style={[styles.progressBar, { width: `${progress}%` }]} />
+        </View>
+      </View>
+    );
+  })}
+</TouchableOpacity>
+
           ))
         )}
 
@@ -526,6 +543,22 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: "#fff",
     fontWeight: "bold",
+  },
+  copyButton: {
+    backgroundColor: "#007bff",
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  copyButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  fleetUID: {
+    fontSize: 14,
+    color: "gray",
+    marginBottom: 5,
   },
   
 });
