@@ -1,16 +1,28 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { auth } from '../../utilis/Firebase';
+import { auth, db } from '../../utilis/Firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { setDoc, doc } from 'firebase/firestore';
 
 const SignupScreen = ({ navigation }) => {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSignup = async () => {
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Save user details in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
+        firstName,
+        lastName,
+        email,
+        uid: user.uid,
+      });
     } catch (error) {
       setError(error.message);
     }
@@ -20,6 +32,18 @@ const SignupScreen = ({ navigation }) => {
     <View style={styles.container}>
       <Text style={styles.title}>Signup</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      <TextInput
+        style={styles.input}
+        placeholder="First Name"
+        value={firstName}
+        onChangeText={setFirstName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Last Name"
+        value={lastName}
+        onChangeText={setLastName}
+      />
       <TextInput
         style={styles.input}
         placeholder="Email"
