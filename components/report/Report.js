@@ -127,23 +127,36 @@ const Report = () => {
       }
   
       const fleetData = fleetSnapshot.data();
+      const currentUser = getAuth().currentUser; // Get logged-in user
+  
+      if (!currentUser) {
+        console.error("No authenticated user found!");
+        return;
+      }
   
       // Toggle completion status of the specific unit
       const updatedUnits = fleetData.units.map((unit, index) =>
-        index === unitIndex ? { ...unit, completed: !unit.completed } : unit
+        index === unitIndex
+          ? {
+              ...unit,
+              completed: !unit.completed,
+              completedAt: !unit.completed ? new Date().toISOString() : null, // Add timestamp if completed
+              completedBy: !unit.completed ? currentUser.email : null, // Store email of user who completed
+            }
+          : unit
       );
   
       // Update Firebase
       await updateDoc(fleetRef, { units: updatedUnits });
   
-      // Update local state to trigger re-render
+      // Update local state
       setFleets((prevFleets) => {
         const newFleets = { ...prevFleets };
   
         Object.keys(newFleets).forEach((date) => {
           newFleets[date] = newFleets[date].map((fleet) => {
             if (fleet.id === fleetId) {
-              return { ...fleet, units: updatedUnits }; // Create a new object reference
+              return { ...fleet, units: updatedUnits };
             }
             return fleet;
           });
@@ -152,7 +165,7 @@ const Report = () => {
         return newFleets;
       });
   
-      // **Update the modal content immediately**
+      // Update modal content
       if (selectedFleet) {
         setSelectedFleet((prevSelectedFleet) =>
           prevSelectedFleet.map((fleet) =>
@@ -164,6 +177,7 @@ const Report = () => {
       console.error("Error updating unit:", error);
     }
   };
+  
   
   
 
@@ -342,6 +356,13 @@ const Report = () => {
     {unit.completed ? "Completed" : "Mark Complete"}
   </Text>
 </TouchableOpacity>
+
+<Text style={styles.unitText}>
+  {unit.completed ? `Completed by: ${unit.completedBy || "Unknown"}` : ""}
+</Text>
+<Text style={styles.unitText}>
+  {unit.completed ? `Completed at: ${new Date(unit.completedAt).toLocaleString()}` : ""}
+</Text>
 
 
     </View>
