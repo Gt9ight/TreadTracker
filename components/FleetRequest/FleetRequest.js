@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, Image } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { db, storage } from "../../utilis/Firebase";
-import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, updateDoc, doc, getDoc } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 import * as ImagePicker from "expo-image-picker";
@@ -32,12 +32,25 @@ const FleetRequest = () => {
   const [selectedUnitIndex, setSelectedUnitIndex] = useState(null);
   const [isSpecificsVisible, setIsSpecificsVisible] = useState(false);
   const [userId, setUserId] = useState(null);
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     const auth = getAuth();
     const currentUser = auth.currentUser;
     if (currentUser) {
       setUserId(currentUser.uid);
+      
+      // Fetch user details from Firestore
+      const getUserDetails = async () => {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setUserName(`${userData.firstName} ${userData.lastName}`);
+        }
+      };
+      
+      getUserDetails();
     }
   }, []);
 
@@ -233,6 +246,7 @@ const FleetRequest = () => {
   };
   return (
     <View style={styles.container}>
+      <Text style={styles.userName}>Welcome, {userName}</Text>
       <Text style={styles.fleetTitle}>
         Fleet: {fleetDate && <Text style={styles.fleetDate}>{fleetDate}</Text>}
       </Text>
@@ -455,6 +469,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "white",
     padding: 20,
+  },
+  userName: {
+    fontSize: 18,
+    marginBottom: 20,
+    color: 'gray',
   },
 
 });
