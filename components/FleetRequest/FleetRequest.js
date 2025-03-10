@@ -139,6 +139,13 @@ const FleetRequest = () => {
     }
   };
 
+  const handleDeleteImage = (unitIndex, imgIndex) => {
+    const updatedImages = { ...unitImages };
+    updatedImages[unitIndex].splice(imgIndex, 1); // Remove image at imgIndex
+    setUnitImages(updatedImages);
+  };
+  
+
   const handleDoneSpecifics = (specifics) => {
     if (selectedUnitIndex !== null) {
       setUnitSpecifics((prev) => ({
@@ -305,9 +312,25 @@ const FleetRequest = () => {
                 ))}
               </View>
             )}
-{unitImages[index] && unitImages[index].map((imageUri, imgIndex) => (
-  <Image key={imgIndex} source={{ uri: imageUri }} style={styles.unitImage} />
-))}
+<ScrollView
+  horizontal
+  contentContainerStyle={styles.imagesContainer}
+  showsHorizontalScrollIndicator={false}
+>
+  {unitImages[index] && unitImages[index].map((imageUri, imgIndex) => (
+    <View key={imgIndex} style={styles.imageContainer}>
+      <Image source={{ uri: imageUri }} style={styles.unitImage} />
+      <TouchableOpacity
+        style={styles.deleteImageButton}
+        onPress={() => handleDeleteImage(index, imgIndex)}
+      >
+        <Text style={styles.deleteImageText}>X</Text>
+      </TouchableOpacity>
+    </View>
+  ))}
+</ScrollView>
+
+
 
 <View style={styles.cardBottomContainer}>
               <TouchableOpacity style={styles.addSpecificsButton}  onPress={() => pickImage(index)} >
@@ -398,10 +421,33 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   unitImage: {
-    width: "100%",
-    height: 150,
+    width: 120, // Adjust this to the size you want
+    height: 120, // Adjust the height as needed
     borderRadius: 8,
-    marginTop: 10,
+    marginRight: 10, // Space between images
+  },
+  imagesContainer: {
+    flexDirection: "row", // Arrange images horizontally
+    paddingVertical: 10, // Optional, adjust for spacing
+  },
+  imageContainer: {
+    position: "relative", // Position the delete button on top of the image
+  },
+  deleteImageButton: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent background for the button
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteImageText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   submitButtonText: {
     color: "#fff",

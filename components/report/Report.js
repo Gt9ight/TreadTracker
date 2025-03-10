@@ -8,6 +8,7 @@ import { getAuth, EmailAuthProvider, reauthenticateWithCredential } from "fireba
 import { getStorage, ref, getDownloadURL, deleteObject } from "firebase/storage";
 import { db,storage } from "../../utilis/Firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
+import ImageViewerModal from "../imageModal/ImageViewerModal";
 
 
 const fetchImageUrls = async (imagePaths) => {
@@ -35,20 +36,34 @@ const Report = () => {
   const [loading, setLoading] = useState(true);
   const [selectedFleet, setSelectedFleet] = useState(null);
   const [user, setUser] = useState(null);
+  const [userName, setUserName] = useState('');
   const [password, setPassword] = useState("");
   const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
   const [fleetToDelete, setFleetToDelete] = useState(null);
+  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
 
   useEffect(() => {
     const auth = getAuth();
     const currentUser = auth.currentUser;
     
-    if (!currentUser) {
-      setLoading(false);
-      return;
+    if (currentUser) {
+      setUser(currentUser.uid);
+      
+      // Fetch user details from Firestore
+      const getUserDetails = async () => {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setUserName(`${userData.firstName} ${userData.lastName}`);
+        }
+      };
+      
+      getUserDetails();
     }
-  
-    setUser(currentUser);
   
     const unsubscribe = onSnapshot(collection(db, "fleets"), async (snapshot) => {
       const fleetData = await Promise.all(snapshot.docs.map(async (doc) => {
@@ -141,7 +156,7 @@ const Report = () => {
               ...unit,
               completed: !unit.completed,
               completedAt: !unit.completed ? new Date().toISOString() : null, // Add timestamp if completed
-              completedBy: !unit.completed ? currentUser.email : null, // Store email of user who completed
+              completedBy: !unit.completed ? userName : null, // Store email of user who completed
             }
           : unit
       );
@@ -237,6 +252,7 @@ const Report = () => {
   return (
     <SafeAreaView>
       <Text style={styles.title}>Fleet Report</Text>
+      <Text style={styles.userName}>Welcome, {userName}</Text>
       <ScrollView contentContainerStyle={styles.container}>
         {Object.keys(fleets).length === 0 ? (
           <Text style={styles.noData}>No fleets available.</Text>
@@ -339,13 +355,23 @@ const Report = () => {
                       </View>
                     )}
 
-      {unit.imageUrl && unit.imageUrl.length > 0 && (
-        <ScrollView horizontal>
-          {unit.imageUrl.map((url, index) => (
-            <Image key={index} source={{ uri: url }} style={styles.unitImage} />
-          ))}
-        </ScrollView>
-      )}
+{unit.imageUrl && unit.imageUrl.length > 0 && (
+  <ScrollView horizontal>
+    {unit.imageUrl.map((url, index) => (
+      <TouchableOpacity 
+        key={index} 
+        onPress={() => {
+          setSelectedImages(unit.imageUrl);
+          setSelectedImageIndex(index);
+          setIsImageModalVisible(true);
+        }}
+      >
+        <Image source={{ uri: url }} style={styles.unitImage} />
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+)}
+
 
       {/* Fix: Ensure fleet.id is passed correctly */}
       <TouchableOpacity 
@@ -363,9 +389,15 @@ const Report = () => {
 <Text style={styles.unitText}>
   {unit.completed ? `Completed at: ${new Date(unit.completedAt).toLocaleString()}` : ""}
 </Text>
-
+<ImageViewerModal 
+  visible={isImageModalVisible} 
+  images={selectedImages} 
+  selectedIndex={selectedImageIndex}
+  onClose={() => setIsImageModalVisible(false)} 
+/>
 
     </View>
+    
   ))
 )}
 
@@ -377,6 +409,8 @@ const Report = () => {
           )}
         </Modal>
       </ScrollView>
+
+
     </SafeAreaView>
   );
 };
