@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { auth } from '../../utilis/Firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -15,6 +15,20 @@ const LoginScreen = ({ navigation }) => {
       setError(error.message);
     }
   };
+
+  const handleForgotPassword = async () => {
+  if (!email) {
+    setError('Please enter your email to reset password');
+    return;
+  }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    setError('Password reset email sent!');
+  } catch (error) {
+    setError(error.message);
+  }
+};
+
 
   return (
     <View style={styles.container}>
@@ -32,16 +46,22 @@ const LoginScreen = ({ navigation }) => {
         placeholder="Password"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
+        secureTextE
+        ntry
       />
+            <TouchableOpacity onPress={handleForgotPassword}>
+  <Text style={styles.forgotPassword}>Forgot Password?</Text>
+</TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
       <View style={styles.signupContainer}>
         <Text>Don't have an account? </Text>
+        
         <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
           <Text style={styles.signupLink}>Go to Signup</Text>
         </TouchableOpacity>
+        
       </View>
     </View>
   );
@@ -94,6 +114,12 @@ const styles = StyleSheet.create({
     color: '#007BFF',
     fontWeight: 'bold',
   },
+  forgotPassword: {
+  color: '#007BFF',
+  textAlign: 'right',
+  marginBottom: 15,
+}
+
 });
 
 export default LoginScreen;

@@ -8,6 +8,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { auth } from './utilis/Firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import Admin from './components/auth/Admin';
+import FleetSearch from './components/search/FleetSearch';
 
 const Tab = createBottomTabNavigator();
 
@@ -23,6 +24,7 @@ export default function App() {
     <NavigationContainer>
       {user ? (
         <Tab.Navigator>
+          <Tab.Screen name="Search" component={FleetSearch} />
           <Tab.Screen name="Report" component={Report} />
           <Tab.Screen name="Fleet Request" component={FleetRequest} />
           <Tab.Screen name="Admin" component={Admin} />

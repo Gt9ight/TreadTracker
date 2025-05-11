@@ -9,6 +9,7 @@ import { getStorage, ref, getDownloadURL, deleteObject } from "firebase/storage"
 import { db,storage } from "../../utilis/Firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ImageViewerModal from "../imageModal/ImageViewerModal";
+import { AntDesign } from '@expo/vector-icons';
 
 
 const fetchImageUrls = async (imagePaths) => {
@@ -263,19 +264,18 @@ const Report = () => {
   onPress={() => handleFleetPress(fleets[fleetDate])} 
   style={styles.fleetCard}
 >
-  <TouchableOpacity 
-    onPress={() => {
-      setFleetToDelete({
+<TouchableOpacity 
+            onPress={() => {
+         setFleetToDelete({
         id: fleets[fleetDate][0].id, 
-        imageUrls: fleets[fleetDate].flatMap(fleet => fleet.units?.flatMap(unit => unit.imageUrl || []))
-      });
+       imageUrls: fleets[fleetDate].flatMap(fleet => fleet.units?.flatMap(unit => unit.imageUrl || []))
+       });
       setIsPasswordModalVisible(true);
-    }} 
-    style={styles.deleteButton}
-  >
-    <Text style={styles.deleteButtonText}>Delete Fleet</Text>
-  </TouchableOpacity>
-
+      }} 
+     style={styles.deleteButton}
+    >
+  <AntDesign name="close" size={24} color="white" />
+</TouchableOpacity>
   <Text style={styles.fleetDate}>Fleet Date: {fleetDate}</Text>
 
   {/* Display the fleet UID */}
@@ -356,7 +356,7 @@ const Report = () => {
                     )}
 
 {unit.imageUrl && unit.imageUrl.length > 0 && (
-  <ScrollView horizontal>
+  <ScrollView horizontal >
     {unit.imageUrl.map((url, index) => (
       <TouchableOpacity 
         key={index} 
@@ -544,11 +544,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   deleteButton: {
-    backgroundColor: "red",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 20,
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'red',
+    borderRadius: 15,
+    padding: 5,
+    zIndex: 1, // Ensure the delete button is on top
   },
   deleteButtonText: {
     color: "#fff",
